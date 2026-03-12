@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embedding Model Scorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #13161b;
+    --surface2: #1a1e26;
+    --border: #252a35;
+    --border2: #2e3442;
+    --accent: #4fffb0;
+    --accent-dim: #1a3d2e;
+    --accent2: #7b8cff;
+    --accent2-dim: #1e2250;
+    --red: #ff6b6b;
+    --red-dim: #3d1a1a;
+    --muted: #5a6070;
+    --text: #d8dce8;
+    --text-bright: #f0f2f8;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Fraunces', serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 3rem 1.5rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 2rem;
+  }
+  header h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 2rem;
+    color: var(--text-bright);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  header h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .header-meta {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  /* ── LAYOUT ── */
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: calc(100vh - 80px);
+  }
+
+  /* ── LEFT PANEL ── */
+  aside {
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 1px dashed var(--border2);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-dim); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 24px; margin-bottom: 0.5rem; opacity: 0.5; }
+  .upload-zone p { font-size: 12px; color: var(--muted); }
+  .upload-zone strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
+
+  .file-status {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--accent);
+    display: none;
+  }
+
+  /* ── CONTROLS ── */
+  .control-group { margin-bottom: 1.25rem; }
+  .control-group label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.05em;
+  }
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+  }
+  select:focus, input[type="number"]:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  /* ── COMPARE SECTION ── */
+  .compare-block {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .compare-block .panel-title { margin-bottom: 0.75rem; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+  .btn-accent:hover { background: #2de89a; border-color: #2de89a; color: #000; }
+  .btn-full { width: 100%; justify-content: center; }
+  .btn-compare {
+    background: var(--accent2-dim);
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn-compare:hover { background: var(--accent2); color: #fff; }
+
+  /* ── RIGHT PANEL ── */
+  section.results {
+    padding: 2rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  .empty-state .big { font-size: 3rem; opacity: 0.2; }
+  .empty-state h2 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 1.3rem;
+    color: var(--text);
+    opacity: 0.4;
+  }
+  .empty-state p { font-size: 12px; max-width: 320px; line-height: 1.7; }
+
+  /* ── SCORES TABLE ── */
+  .scores-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .scores-header h2 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 1.4rem;
+    color: var(--text-bright);
+  }
+  .metric-tag {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .model-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 120px 150px;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 0.5rem;
+    animation: fadeIn 0.3s ease forwards;
+    opacity: 0;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .model-row:hover { border-color: var(--border2); background: var(--surface2); }
+  .model-row.top {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .model-name {
+    font-size: 13px;
+    color: var(--text-bright);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .model-row.top .model-name { color: var(--accent); }
+  .rank-badge {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--border2);
+    color: var(--muted);
+    font-size: 10px;
+    text-align: center;
+    line-height: 20px;
+    margin-right: 0.5rem;
+  }
+  .model-row.top .rank-badge { background: var(--accent); color: #000; }
+
+  .bar-track {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .model-row.top .bar-track { background: rgba(79,255,176,0.15); }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent2);
+    transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .model-row.top .bar-fill { background: var(--accent); }
+
+  .score-val {
+    font-size: 20px;
+    font-family: var(--serif);
+    font-weight: 600;
+    color: var(--text-bright);
+    text-align: right;
+  }
+  .model-row.top .score-val { color: var(--accent); }
+
+  .ci-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* ── COMPARISON RESULT ── */
+  .compare-result-box {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 1.5rem 2rem;
+    animation: fadeIn 0.3s ease forwards;
+  }
+  .compare-result-box h3 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 1.2rem;
+    color: var(--text-bright);
+    margin-bottom: 1rem;
+  }
+  .verdict {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+  .verdict.sig-a { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+  .verdict.sig-b { background: var(--accent2-dim); color: var(--accent2); border: 1px solid var(--accent2); }
+  .verdict.nosig { background: var(--surface); color: var(--muted); border: 1px solid var(--border2); }
+
+  .compare-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .stat-cell {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+  }
+  .stat-cell .slabel { font-size: 10px; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.06em; }
+  .stat-cell .sval { font-size: 18px; font-family: var(--serif); color: var(--text-bright); }
+
+  /* CI visualisation */
+  .ci-viz {
+    margin-top: 1rem;
+  }
+  .ci-viz-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.05em;
+  }
+  .ci-track {
+    position: relative;
+    height: 28px;
+    background: var(--surface);
+    border-radius: 6px;
+    overflow: visible;
+  }
+  .ci-range {
+    position: absolute;
+    top: 4px;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--accent2);
+    opacity: 0.3;
+  }
+  .ci-mean-line {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 28px;
+    background: var(--accent2);
+    border-radius: 1px;
+  }
+  .ci-zero-line {
+    position: absolute;
+    top: -4px;
+    width: 1px;
+    height: 36px;
+    background: var(--muted);
+  }
+  .ci-ticks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* ── DATA PREVIEW ── */
+  .data-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .data-preview-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .data-table th {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .pill {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .pill.rel { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── DATA FORMAT DOCS ── */
+  .format-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  .format-box pre {
+    background: #0a0c0f;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 11px;
+    color: var(--text);
+    overflow-x: auto;
+    margin-top: 0.75rem;
+    line-height: 1.7;
+  }
+  .format-box .key { color: var(--accent2); }
+  .format-box .val { color: var(--accent); }
+  .format-box .comment { color: var(--muted); }
+
+  .demo-btn-wrap { margin-top: 1rem; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
+    header { padding: 1.5rem; }
+    section.results { padding: 1.5rem; }
+    .model-row { grid-template-columns: 1fr 1fr; }
+    .compare-stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Embedding Model <em>Scorer</em></h1>
+  </div>
+  <div class="header-meta">
+    Task-Specific Applicability Scoring<br>
+    nDCG@k · MRR · Recall@k · Bootstrap CI
+  </div>
+</header>
+
+<main>
+  <!-- ── LEFT PANEL ── -->
+  <aside>
+
+    <div>
+      <div class="panel-title">Upload data</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".json">
+        <div class="upload-icon">⬆</div>
+        <strong>Drop JSON file here</strong>
+        <p>or click to browse</p>
+      </div>
+      <div class="file-status" id="fileStatus"></div>
+    </div>
+
+    <div>
+      <div class="panel-title">Metric settings</div>
+      <div class="control-group">
+        <label>Metric</label>
+        <select id="metricSelect">
+          <option value="ndcg">nDCG@k</option>
+          <option value="mrr">MRR</option>
+          <option value="recall">Recall@k</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>k (cut-off depth)</label>
+        <input type="number" id="kVal" value="5" min="1" max="50">
+      </div>
+      <div class="control-group">
+        <label>Bootstrap replicates (B)</label>
+        <input type="number" id="bVal" value="1000" min="100" max="10000">
+      </div>
+      <button class="btn btn-accent btn-full" onclick="runScoring()">Compute scores</button>
+    </div>
+
+    <!-- COMPARE BLOCK -->
+    <div class="compare-block">
+      <div class="panel-title">Compare two models</div>
+      <div class="control-group">
+        <label>Model A</label>
+        <select id="cmpA"></select>
+      </div>
+      <div class="control-group">
+        <label>Model B</label>
+        <select id="cmpB"></select>
+      </div>
+      <button class="btn btn-compare btn-full" onclick="runComparison()">Run paired comparison →</button>
+    </div>
+
+    <div>
+      <div class="panel-title">Demo</div>
+      <button class="btn btn-full" onclick="loadDemo()">Load synthetic demo data</button>
+    </div>
+
+  </aside>
+
+  <!-- ── RIGHT PANEL ── -->
+  <section class="results" id="resultsPanel">
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="big">◈</div>
+      <h2>No data loaded yet</h2>
+      <p>Upload a JSON file or click "Load synthetic demo data" to score your embedding models.</p>
+      <div style="margin-top:1.5rem">
+        <div style="text-align:left;max-width:340px">
+          <div class="panel-title" style="margin-bottom:0.75rem">Expected JSON format</div>
+          <div class="format-box">
+            <pre><span class="comment">// data.json</span>
+{
+  <span class="key">"models"</span>: [<span class="val">"ModelA"</span>, <span class="val">"ModelB"</span>],
+  <span class="key">"queries"</span>: [
+    {
+      <span class="key">"id"</span>: <span class="val">"q1"</span>,
+      <span class="key">"candidates"</span>: [
+        {
+          <span class="key">"id"</span>: <span class="val">"c1"</span>,
+          <span class="comment">// 1 = relevant, 0 = not</span>
+          <span class="key">"rel"</span>: <span class="val">1</span>,
+          <span class="comment">// one score per model</span>
+          <span class="key">"sim"</span>: [<span class="val">0.91</span>, <span class="val">0.75</span>]
+        },
+        {
+          <span class="key">"id"</span>: <span class="val">"c2"</span>,
+          <span class="key">"rel"</span>: <span class="val">0</span>,
+          <span class="key">"sim"</span>: [<span class="val">0.43</span>, <span class="val">0.61</span>]
+        }
+      ]
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scores section (hidden until computed) -->
+    <div id="scoresSection" style="display:none">
+      <div class="scores-header">
+        <h2>Applicability Scores</h2>
+        <span class="metric-tag" id="metricTag">nDCG@5</span>
+      </div>
+      <div id="modelRows"></div>
+    </div>
+
+    <!-- Comparison result -->
+    <div id="compareSection" style="display:none"></div>
+
+    <!-- Data preview -->
+    <div id="previewSection" style="display:none">
+      <div class="scores-header">
+        <h2 style="font-size:1.1rem">Query preview</h2>
+        <span id="previewCount" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+      <div class="data-preview">
+        <div class="data-preview-header">
+          <span>First 10 queries</span>
+          <span id="modelListLabel"></span>
+        </div>
+        <table class="data-table" id="previewTable"></table>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<script src="metrics.js"></script>
+<script src="bootstrap.js"></script>
+<script>
+/* ──────────────────────────────────
+   App state
+────────────────────────────────── */
+let appData = null; // parsed JSON
+let computedScores = {}; // { modelName: { mean, lo, hi, perQuery } }
+
+/* ──────────────────────────────────
+   File upload
+────────────────────────────────── */
+const fileInput = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) handleFile(file);
+});
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      validateData(parsed);
+      appData = parsed;
+      const status = document.getElementById('fileStatus');
+      status.style.display = 'block';
+      status.textContent = `✓ ${file.name} — ${parsed.queries.length} queries, ${parsed.models.length} models`;
+      computedScores = {};
+      renderPreview();
+      populateCompareSelects();
+      hideEmptyState();
+    } catch (err) {
+      alert('Invalid JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function validateData(d) {
+  if (!Array.isArray(d.models)) throw new Error('"models" must be an array of strings.');
+  if (!Array.isArray(d.queries)) throw new Error('"queries" must be an array.');
+  d.queries.forEach((q, i) => {
+    if (!Array.isArray(q.candidates)) throw new Error(`Query ${i}: missing "candidates" array.`);
+    q.candidates.forEach((c, j) => {
+      if (typeof c.rel === 'undefined') throw new Error(`Query ${i}, candidate ${j}: missing "rel".`);
+      if (!Array.isArray(c.sim) || c.sim.length !== d.models.length)
+        throw new Error(`Query ${i}, candidate ${j}: "sim" must have ${d.models.length} values.`);
+    });
+  });
+}
+
+/* ──────────────────────────────────
+   Scoring
+────────────────────────────────── */
+function runScoring() {
+  if (!appData) { alert('Please upload data or load the demo first.'); return; }
+  const k = parseInt(document.getElementById('kVal').value) || 5;
+  const B = parseInt(document.getElementById('bVal').value) || 1000;
+  const metric = document.getElementById('metricSelect').value;
+
+  computedScores = {};
+  appData.models.forEach((name, mi) => {
+    const perQuery = computePerQueryScores(appData.queries, mi, k, metric);
+    const { mean, lo, hi } = bootstrapCI(perQuery, B);
+    computedScores[name] = { mean, lo, hi, perQuery };
+  });
+
+  renderScores(metric, k);
+  populateCompareSelects();
+  hideEmptyState();
+}
+
+function renderScores(metric, k) {
+  const tag = { ndcg: `nDCG@${k}`, mrr: 'MRR', recall: `Recall@${k}` }[metric];
+  document.getElementById('metricTag').textContent = tag;
+
+  const sorted = Object.entries(computedScores).sort((a, b) => b[1].mean - a[1].mean);
+  const best = sorted[0][1].mean;
+
+  const container = document.getElementById('modelRows');
+  container.innerHTML = '';
+
+  sorted.forEach(([name, s], i) => {
+    const pct = (s.mean * 100).toFixed(2);
+    const loPct = (s.lo * 100).toFixed(1);
+    const hiPct = (s.hi * 100).toFixed(1);
+    const barW = best > 0 ? (s.mean / best * 100).toFixed(1) : 0;
+    const isTop = i === 0;
+
+    const row = document.createElement('div');
+    row.className = 'model-row' + (isTop ? ' top' : '');
+    row.style.animationDelay = (i * 0.05) + 's';
+    row.innerHTML = `
+      <div class="model-name">
+        <span class="rank-badge">${i + 1}</span>${name}
+      </div>
+      <div>
+        <div class="bar-track"><div class="bar-fill" style="width:${barW}%"></div></div>
+      </div>
+      <div>
+        <div class="score-val">${pct}<span style="font-size:13px;opacity:0.5">%</span></div>
+        <div class="ci-label">[${loPct}%, ${hiPct}%]</div>
+      </div>
+      <div class="ci-label" style="font-size:11px;color:var(--muted);line-height:1.6">
+        n = ${s.perQuery.length} queries<br>
+        95% CI bootstrap
+      </div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById('scoresSection').style.display = 'block';
+  document.getElementById('compareSection').style.display = 'none';
+}
+
+/* ──────────────────────────────────
+   Pairwise comparison
+────────────────────────────────── */
+function populateCompareSelects() {
+  const models = appData ? appData.models : [];
+  ['cmpA', 'cmpB'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+    if (models.includes(prev)) sel.value = prev;
+    else sel.selectedIndex = Math.min(idx, models.length - 1);
+  });
+}
+
+function runComparison() {
+  const nameA = document.getElementById('cmpA').value;
+  const nameB = document.getElementById('cmpB').value;
+  if (nameA === nameB) { alert('Please select two different models.'); return; }
+  if (!computedScores[nameA] || !computedScores[nameB]) {
+    alert('Please run "Compute scores" first.'); return;
+  }
+
+  const B = parseInt(document.getElementById('bVal').value) || 1000;
+  const { meanDiff, lo, hi, significant, winner } =
+    pairedBootstrapComparison(computedScores[nameA].perQuery, computedScores[nameB].perQuery, B);
+
+  const winnerName = winner === 'A' ? nameA : winner === 'B' ? nameB : null;
+  let verdictClass = 'nosig', verdictText = 'No significant difference';
+  if (significant) {
+    verdictClass = winner === 'A' ? 'sig-a' : 'sig-b';
+    verdictText = `${winnerName} is significantly better`;
+  }
+
+  // CI visualisation
+  const range = Math.max(Math.abs(lo), Math.abs(hi), 0.05) * 1.4;
+  const toPos = v => Math.min(99, Math.max(1, ((v + range) / (2 * range)) * 100));
+  const loPos = toPos(lo), hiPos = toPos(hi), meanPos = toPos(meanDiff), zeroPos = toPos(0);
+
+  const section = document.getElementById('compareSection');
+  section.style.display = 'block';
+  section.innerHTML = `
+    <div class="compare-result-box">
+      <h3>${nameA} <span style="color:var(--muted)">vs</span> ${nameB}</h3>
+      <span class="verdict ${verdictClass}">${verdictText}</span>
+      <div class="compare-stats">
+        <div class="stat-cell">
+          <div class="slabel">Δ̂ (mean diff)</div>
+          <div class="sval">${(meanDiff * 100).toFixed(2)}%</div>
+        </div>
+        <div class="stat-cell">
+          <div class="slabel">CI lower</div>
+          <div class="sval">${(lo * 100).toFixed(2)}%</div>
+        </div>
+        <div class="stat-cell">
+          <div class="slabel">CI upper</div>
+          <div class="sval">${(hi * 100).toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="ci-viz">
+        <div class="ci-viz-label">95% bootstrap CI on Δ — zero line shows no difference</div>
+        <div class="ci-track">
+          <div class="ci-range" style="left:${Math.min(loPos,zeroPos).toFixed(1)}%;width:${Math.abs(hiPos-loPos).toFixed(1)}%"></div>
+          <div class="ci-mean-line" style="left:${meanPos.toFixed(1)}%"></div>
+          <div class="ci-zero-line" style="left:${zeroPos.toFixed(1)}%"></div>
+        </div>
+        <div class="ci-ticks">
+          <span>${(-range * 100).toFixed(1)}%</span>
+          <span>0</span>
+          <span>+${(range * 100).toFixed(1)}%</span>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:1rem;line-height:1.7">
+        Paired bootstrap at query level (B=${B}).
+        ${significant
+          ? `CI excludes zero → <strong style="color:var(--text)">${winnerName}</strong> is the superior model at 95% confidence.`
+          : 'CI includes zero → insufficient evidence to declare a winner.'}
+      </p>
+    </div>
+  `;
+
+  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ──────────────────────────────────
+   Data preview table
+────────────────────────────────── */
+function renderPreview() {
+  if (!appData) return;
+  const models = appData.models;
+  const queries = appData.queries.slice(0, 10);
+
+  document.getElementById('previewCount').textContent =
+    `${appData.queries.length} queries total`;
+  document.getElementById('modelListLabel').textContent =
+    models.join(' · ');
+
+  const thead = `<thead><tr>
+    <th>Query ID</th><th>Candidates</th><th>Relevant</th>
+    ${models.map(m => `<th>Avg sim (${m})</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = '<tbody>' + queries.map(q => {
+    const relCount = q.candidates.filter(c => c.rel > 0).length;
+    const avgSims = models.map((_, mi) =>
+      (q.candidates.reduce((s, c) => s + c.sim[mi], 0) / q.candidates.length).toFixed(3)
+    );
+    return `<tr>
+      <td>${q.id ?? '—'}</td>
+      <td>${q.candidates.length}</td>
+      <td><span class="pill rel">${relCount}</span></td>
+      ${avgSims.map(s => `<td>${s}</td>`).join('')}
+    </tr>`;
+  }).join('') + '</tbody>';
+
+  document.getElementById('previewTable').innerHTML = thead + tbody;
+  document.getElementById('previewSection').style.display = 'block';
+}
+
+/* ──────────────────────────────────
+   Demo data generator
+────────────────────────────────── */
+function loadDemo() {
+  const modelNames = ['BGE-large', 'E5-large', 'text-embed-3', 'GTE-base'];
+  const nQueries = 40;
+  // model quality weights — higher = better retrieval
+  const quality = [0.72, 0.61, 0.55, 0.45];
+
+  const queries = Array.from({ length: nQueries }, (_, qi) => {
+    const nCands = 8 + Math.floor(Math.random() * 12);
+    const rels = Array.from({ length: nCands }, (__, ci) => ci < 2 ? 1 : 0)
+      .sort(() => Math.random() - 0.5);
+    const candidates = rels.map((rel, ci) => ({
+      id: `c${ci + 1}`,
+      rel,
+      sim: modelNames.map((_, mi) =>
+        Math.min(1, Math.max(0,
+          rel * quality[mi] + (1 - rel) * (0.3 - quality[mi] * 0.2) + (Math.random() - 0.5) * 0.25
+        ))
+      )
+    }));
+    return { id: `Q${qi + 1}`, candidates };
+  });
+
+  appData = { models: modelNames, queries };
+  const status = document.getElementById('fileStatus');
+  status.style.display = 'block';
+  status.textContent = `✓ Demo data — ${nQueries} queries, ${modelNames.length} models`;
+
+  computedScores = {};
+  renderPreview();
+  populateCompareSelects();
+  hideEmptyState();
+  runScoring(); // auto-compute on demo load
+}
+
+function hideEmptyState() {
+  document.getElementById('emptyState').style.display = 'none';
+}
+</script>
+</body>
+</html>
